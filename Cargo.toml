@@ -14,7 +14,7 @@
 
 [package]
 name = "hls_lfcd_lds_driver"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 repository = "https://github.com/gabrik/hls_lfcd_lds_rs"
@@ -28,7 +28,9 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = {version = "1.17.0", features = ["full"] }
-clap = { version = "3.1", features = ["derive"] }
+tokio = {version = "1.17.0", features = ["io-util"] }
 tokio-serial = "5.4.1"
-futures = "0.3.21"
+
+[dev-dependencies]
+clap = { version = "3.1", features = ["derive"] }
+tokio = {version = "1.17.0", features = ["macros","rt","rt-multi-thread"] }
