@@ -12,13 +12,26 @@
 //   Gabriele Baldoni, <gabriele@gabrielebaldoni.com>
 //
 
+//! hls_lfcd_lds_driver provides a rust version of the LDS01 driver from robotis.
+//! This crate facilitates reading information from that specific lidar.
+
 use tokio::io::AsyncReadExt;
 use tokio_serial::SerialPortBuilderExt;
 use tokio_serial::SerialStream;
 
+/// Default serial port of the lidar
 pub static DEFAULT_PORT: &str = "/dev/ttyUSB0";
+/// Default baud_rate of the lidar
 pub static DEFAULT_BAUD_RATE: &str = "230400";
 
+/// This struct contains the reading from the lidar.
+/// The `ranges` array contains 360 elements, one for each degree,
+/// with a value from 0 to 1000, indicating the distance.
+///
+/// The `intensites` array contains 360 elements, one for each degree,
+/// with a value, indicating accuracy of the reading
+///
+/// The `rmps` field gets the lidar RPMs
 #[derive(Debug)]
 pub struct LaserReading {
     pub ranges: [u16; 360],
@@ -42,6 +55,7 @@ impl Default for LaserReading {
     }
 }
 
+/// This struct allows to read lidar information and to "shutdown" the driver
 pub struct LFCDLaser {
     port: String,
     baud_rate: u32,
@@ -53,6 +67,12 @@ pub struct LFCDLaser {
 }
 
 impl LFCDLaser {
+    /// Creates a new `LFCDLaser` with the given parameters.
+    ///
+    /// # Errors
+    /// An error variant is returned in case of:
+    /// - unable to open the specified serial port
+    /// - unable to set the port to non-exclusive (only on unix)
     pub fn new(port: String, baud_rate: u32) -> tokio_serial::Result<Self> {
         let mut serial = tokio_serial::new(port.clone(), baud_rate).open_native_async()?;
 
@@ -70,26 +90,37 @@ impl LFCDLaser {
         })
     }
 
+    /// Creates the `LFCDLaser`
     pub fn close(&mut self) {
         self.shutting_down = true;
     }
 
+    /// Gets lidar speed.
     pub fn speed(&self) -> u16 {
         self.motor_speed
     }
 
+    /// Gets the configured baud rate
     pub fn baud_rate(&self) -> u32 {
         self.baud_rate
     }
 
+    /// Gets the configured serial port
     pub fn port(&self) -> String {
         self.port.clone()
     }
 
+    /// Gets the lidars rmp from the last reading
     pub fn rpms(&self) -> u16 {
         self.rpms
     }
 
+    /// Gets a reading from the lidar, returing a `LaserReading` object.
+    ///
+    /// # Errors
+    /// An error variant is returned in case of:
+    /// - unable to read form the serial port
+    /// - the driver is closed
     pub async fn read(&mut self) -> tokio_serial::Result<LaserReading> {
         let mut start_count: usize = 0;
         let mut good_sets: u8 = 0;
