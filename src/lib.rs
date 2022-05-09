@@ -19,6 +19,11 @@ use tokio::io::AsyncReadExt;
 use tokio_serial::SerialPortBuilderExt;
 use tokio_serial::SerialStream;
 
+#[cfg(feature = "serde")]
+use serde::{Serialize, Deserialize};
+#[cfg(feature = "serde")]
+use serde_big_array::BigArray;
+
 /// Default serial port of the lidar
 pub static DEFAULT_PORT: &str = "/dev/ttyUSB0";
 /// Default baud_rate of the lidar
@@ -32,6 +37,25 @@ pub static DEFAULT_BAUD_RATE: &str = "230400";
 /// with a value, indicating accuracy of the reading
 ///
 /// The `rmps` field gets the lidar RPMs
+#[cfg(feature = "serde")]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LaserReading {
+    #[serde(with = "BigArray")]
+    pub ranges: [u16; 360],
+    #[serde(with = "BigArray")]
+    pub intensities: [u16; 360],
+    pub rpms: u16,
+}
+
+/// This struct contains the reading from the lidar.
+/// The `ranges` array contains 360 elements, one for each degree,
+/// with a value from 0 to 1000, indicating the distance.
+///
+/// The `intensites` array contains 360 elements, one for each degree,
+/// with a value, indicating accuracy of the reading
+///
+/// The `rmps` field gets the lidar RPMs
+#[cfg(not(feature = "serde"))]
 #[derive(Debug)]
 pub struct LaserReading {
     pub ranges: [u16; 360],
