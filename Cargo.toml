@@ -28,11 +28,11 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = {version = "1.17.0", features = ["io-util"] }
-tokio-serial = "5.4.1"
+tokio = {version = "1.17.0", features = ["io-util"] , optional = true}
+tokio-serial = {version = "5.4.1", optional = true}
 serde = { version = "1.0", features = ["derive", "rc"], optional = true }
 serde-big-array = {version = "0.4", optional = true}
-
+serialport = {version = "4.1", optional = true}
 [dev-dependencies]
 clap = { version = "3.1", features = ["derive"] }
 tokio = {version = "1.17.0", features = ["macros","rt","rt-multi-thread"] }
@@ -41,4 +41,7 @@ tokio = {version = "1.17.0", features = ["macros","rt","rt-multi-thread"] }
 
 [features]
 ser_de = ["serde","serde-big-array"]
-default = []
+async_tokio = ["tokio","tokio-serial"]
+sync = ["serialport"]
+
+default = ["async_tokio"]

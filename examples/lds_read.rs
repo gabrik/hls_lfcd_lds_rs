@@ -23,6 +23,7 @@ struct Args {
     baud_rate: u32,
 }
 
+#[cfg(feature = "async_tokio")]
 #[tokio::main]
 async fn main() -> tokio_serial::Result<()> {
     let args = Args::parse();
@@ -35,6 +36,22 @@ async fn main() -> tokio_serial::Result<()> {
 
     loop {
         let reading = port.read().await?;
+        println!("Reading: {reading:?}")
+    }
+}
+
+#[cfg(feature = "sync")]
+fn main() -> serialport::Result<()> {
+    let args = Args::parse();
+    println!(
+        "Going to open LDS01 on {} with {}",
+        args.port, args.baud_rate
+    );
+
+    let mut port = LFCDLaser::new(args.port, args.baud_rate)?;
+
+    loop {
+        let reading = port.read()?;
         println!("Reading: {reading:?}")
     }
 }
