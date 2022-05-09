@@ -21,7 +21,7 @@ repository = "https://github.com/gabrik/hls_lfcd_lds_rs"
 homepage = "https://github.com/gabrik/hls_lfcd_lds_rs"
 authors = ["gabrik <gabriele.baldoni@gmail.com>"]
 license = " EPL-2.0 OR Apache-2.0"
-categories = ["drivers"]
+categories = ["asynchronous", "hardware-support"]
 description = "Rust driver for ROBOTIS HLDS HLS-LFCD-LDS (LDS-01)"
 readme = "README.md"
 
@@ -33,15 +33,20 @@ tokio-serial = {version = "5.4.1", optional = true}
 serde = { version = "1.0", features = ["derive", "rc"], optional = true }
 serde-big-array = {version = "0.4", optional = true}
 serialport = {version = "4.1", optional = true}
+mio-serial = {version = "5.0.2", optional = true}
+
+
+
 [dev-dependencies]
 clap = { version = "3.1", features = ["derive"] }
 tokio = {version = "1.17.0", features = ["macros","rt","rt-multi-thread"] }
-
+async-std = { version = "=1.11.0", features = ["attributes"]}
 
 
 [features]
 ser_de = ["serde","serde-big-array"]
 async_tokio = ["tokio","tokio-serial"]
+async_mio = ["mio-serial"]
 sync = ["serialport"]
 
-default = ["async_tokio"]
+default = ["async_mio"]

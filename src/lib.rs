@@ -18,9 +18,13 @@
 #[cfg(feature = "async_tokio")]
 use tokio::io::AsyncReadExt;
 #[cfg(feature = "async_tokio")]
-use tokio_serial::SerialPortBuilderExt;
-#[cfg(feature = "async_tokio")]
-use tokio_serial::SerialStream;
+use tokio_serial::{SerialStream, SerialPortBuilderExt};
+
+#[cfg(feature = "async_mio")]
+use mio_serial::{SerialStream, SerialPortBuilderExt};
+#[cfg(feature = "async_mio")]
+use std::io::Read;
+
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -97,6 +101,8 @@ pub struct LFCDLaser {
     motor_speed: u16,
     rpms: u16,
     #[cfg(feature = "async_tokio")]
+    serial: SerialStream,
+    #[cfg(feature = "async_mio")]
     serial: SerialStream,
     #[cfg(feature = "sync")]
     serial: TTYPort,
@@ -341,4 +347,148 @@ impl LFCDLaser {
             }
         }
     }
+}
+
+
+
+
+#[cfg(feature = "async_mio")]
+impl LFCDLaser {
+    /// Creates a new `LFCDLaser` with the given parameters.
+    ///
+    /// # Errors
+    /// An error variant is returned in case of:
+    /// - unable to open the specified serial port
+    /// - unable to set the port to non-exclusive (only on unix)
+    pub fn new(port: String, baud_rate: u32) -> mio_serial::Result<Self> {
+        let mut serial = mio_serial::new(port.clone(), baud_rate).open_native_async()?;
+
+        #[cfg(unix)]
+        serial.set_exclusive(false)?;
+
+        Ok(Self {
+            port,
+            baud_rate,
+            shutting_down: false,
+            motor_speed: 0,
+            rpms: 0,
+            serial,
+            buff: [0u8; 2520],
+        })
+    }
+
+    /// Gets a reading from the lidar, returing a `LaserReading` object.
+    ///
+    /// # Errors
+    /// An error variant is returned in case of:
+    /// - unable to read form the serial port
+    /// - the driver is closed
+    pub async fn read(&mut self) -> mio_serial::Result<LaserReading> {
+        let mut start_count: usize = 0;
+        let mut good_sets: u8 = 0;
+
+        let mut scan = LaserReading::new();
+
+        if self.shutting_down {
+            return Err(mio_serial::Error::new(
+                mio_serial::ErrorKind::Unknown,
+                "Driver is closed",
+            ));
+        }
+
+        loop {
+            // Wait for data sync of frame: 0xFA, 0XA0
+
+            // Read one byte
+            mio_read_exact!(& mut self.serial, std::slice::from_mut(&mut self.buff[start_count]))?;
+            // self.read_exact(std::slice::from_mut(&mut self.buff[start_count]))?;
+            //println!("start_count : {start_count} = Read {:02X?}", buff[start_count]);
+            if start_count == 0 {
+                if self.buff[start_count] == 0xFA {
+                    start_count = 1
+                }
+            } else if start_count == 1 {
+                if self.buff[start_count] == 0xA0 {
+                    // self.read_exact(&mut self.buff[2..])?;
+                    mio_read_exact!(&mut self.serial, &mut self.buff[2..])?;
+
+                    //read data in sets of 6
+
+                    for i in (0..self.buff.len()).step_by(42) {
+                        if self.buff[i] == 0xFA && usize::from(self.buff[i + 1]) == (0xA0 + i / 42)
+                        {
+                            good_sets = good_sets.wrapping_add(1);
+
+                            let b_rmp0: u16 = self.buff[i + 3] as u16;
+                            let b_rmp1: u16 = self.buff[i + 2] as u16;
+
+                            // motor_speed = motor_speed.wrapping_add((b_rmp0 as u32) << 8 + (b_rmp1 as u32)); // accumulate count for avg. time increment
+                            let rpms = (b_rmp0 << 8 | b_rmp1) / 10;
+                            scan.rpms = rpms;
+                            self.rpms = rpms;
+
+                            for j in ((i + 4)..(i + 40)).step_by(6) {
+                                let index = 6 * (i / 42) + (j - 4 - i) / 6;
+                                // Four bytes `per reading
+                                let b0: u16 = self.buff[j] as u16;
+                                let b1: u16 = self.buff[j + 1] as u16;
+                                let b2: u16 = self.buff[j + 2] as u16;
+                                let b3: u16 = self.buff[j + 3] as u16;
+
+                                // Remaining bits are the range in mm
+                                let range: u16 = (b3 << 8) + b2;
+
+                                // Last two bytes represents the uncertanity or intensity, might also
+                                // be pixel area of target...
+                                // let intensity = (b3 << 8) + b2;
+                                let intensity: u16 = (b1 << 8) + b0;
+
+                                scan.ranges[359 - index] = range;
+                                scan.intensities[359 - index] = intensity;
+                            }
+                        }
+                    }
+
+                    // self.time_increment = motor_speed/good_sets/1e8;
+                    return Ok(scan);
+                } else {
+                    start_count = 0;
+                }
+            }
+        }
+    }
+
+
+    // pub fn read_exact(&mut self, buf: &mut [u8]) -> mio_serial::Result<()> {
+    //     loop {
+    //         match self.serial.read_exact(buf) {
+    //             Ok(_) => return Ok(()),
+    //             Err(e) => {
+    //                 match e.kind() {
+    //                     std::io::ErrorKind::WouldBlock => (),
+    //                     _ => return Err(mio_serial::Error::from(e))
+    //                 }
+    //             }
+    //         }
+    //     }
+
+    // }
+}
+
+
+#[macro_export]
+macro_rules! mio_read_exact {
+    ($serial : expr, $buf: expr) => {
+        loop {
+            match $serial.read_exact($buf) {
+                Ok(_) => break Ok(()),
+                Err(e) => {
+                    match e.kind() {
+                        std::io::ErrorKind::WouldBlock => (),
+                        _ => break Err(mio_serial::Error::from(e))
+                    }
+                }
+            }
+        }
+    };
 }

@@ -55,3 +55,21 @@ fn main() -> serialport::Result<()> {
         println!("Reading: {reading:?}")
     }
 }
+
+
+#[cfg(feature = "async_mio")]
+#[async_std::main]
+async fn main() -> mio_serial::Result<()> {
+    let args = Args::parse();
+    println!(
+        "Going to open LDS01 on {} with {}",
+        args.port, args.baud_rate
+    );
+
+    let mut port = LFCDLaser::new(args.port, args.baud_rate)?;
+
+    loop {
+        let reading = port.read().await?;
+        println!("Reading: {reading:?}")
+    }
+}
