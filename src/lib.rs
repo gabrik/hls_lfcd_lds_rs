@@ -38,7 +38,7 @@ pub static DEFAULT_BAUD_RATE: &str = "230400";
 ///
 /// The `rmps` field gets the lidar RPMs
 #[cfg(feature = "serde")]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LaserReading {
     #[serde(with = "BigArray")]
     pub ranges: [u16; 360],
@@ -56,7 +56,7 @@ pub struct LaserReading {
 ///
 /// The `rmps` field gets the lidar RPMs
 #[cfg(not(feature = "serde"))]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LaserReading {
     pub ranges: [u16; 360],
     pub intensities: [u16; 360],
