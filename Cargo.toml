@@ -33,8 +33,9 @@ tokio-serial = {version = "5.4.1", optional = true}
 serde = { version = "1.0", features = ["derive", "rc"], optional = true }
 serde-big-array = {version = "0.4", optional = true}
 serialport = {version = "4.1", optional = true}
-mio-serial = {version = "5.0.2", optional = true}
-
+mio-serial = {version = "5.0.2", default-features = false, optional = true}
+smol = {version = "1.2", optional = true}
+futures = {version = "0.3", optional = true}
 
 
 [dev-dependencies]
@@ -46,7 +47,7 @@ async-std = { version = "=1.11.0", features = ["attributes"]}
 [features]
 ser_de = ["serde","serde-big-array"]
 async_tokio = ["tokio","tokio-serial"]
-async_mio = ["mio-serial"]
+async_smol = ["mio-serial","smol", "futures"]
 sync = ["serialport"]
 
-default = ["async_mio"]
+default = ["async_tokio"]

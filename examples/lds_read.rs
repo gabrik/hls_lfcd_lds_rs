@@ -56,8 +56,7 @@ fn main() -> serialport::Result<()> {
     }
 }
 
-
-#[cfg(feature = "async_mio")]
+#[cfg(feature = "async_smol")]
 #[async_std::main]
 async fn main() -> mio_serial::Result<()> {
     let args = Args::parse();

@@ -18,13 +18,14 @@
 #[cfg(feature = "async_tokio")]
 use tokio::io::AsyncReadExt;
 #[cfg(feature = "async_tokio")]
-use tokio_serial::{SerialStream, SerialPortBuilderExt};
+use tokio_serial::{SerialPortBuilderExt, SerialStream};
 
-#[cfg(feature = "async_mio")]
-use mio_serial::{SerialStream, SerialPortBuilderExt};
-#[cfg(feature = "async_mio")]
-use std::io::Read;
-
+#[cfg(feature = "async_smol")]
+use futures::prelude::*;
+#[cfg(feature = "async_smol")]
+use mio_serial::{SerialPortBuilderExt, SerialStream};
+#[cfg(feature = "async_smol")]
+use smol::Async;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -102,8 +103,8 @@ pub struct LFCDLaser {
     rpms: u16,
     #[cfg(feature = "async_tokio")]
     serial: SerialStream,
-    #[cfg(feature = "async_mio")]
-    serial: SerialStream,
+    #[cfg(feature = "async_smol")]
+    serial: Async<SerialStream>,
     #[cfg(feature = "sync")]
     serial: TTYPort,
     buff: [u8; 2520],
@@ -349,10 +350,7 @@ impl LFCDLaser {
     }
 }
 
-
-
-
-#[cfg(feature = "async_mio")]
+#[cfg(feature = "async_smol")]
 impl LFCDLaser {
     /// Creates a new `LFCDLaser` with the given parameters.
     ///
@@ -365,6 +363,14 @@ impl LFCDLaser {
 
         #[cfg(unix)]
         serial.set_exclusive(false)?;
+
+        // Wrapping into smol::Async to make it "async", similar to what tokio-serial does.
+        let serial = Async::new(serial).map_err(|e| {
+            mio_serial::Error::new(
+                mio_serial::ErrorKind::Unknown,
+                format!("Unable to wrap mio-serial in smol::Async: {e}"),
+            )
+        })?;
 
         Ok(Self {
             port,
@@ -400,8 +406,9 @@ impl LFCDLaser {
             // Wait for data sync of frame: 0xFA, 0XA0
 
             // Read one byte
-            mio_read_exact!(& mut self.serial, std::slice::from_mut(&mut self.buff[start_count]))?;
-            // self.read_exact(std::slice::from_mut(&mut self.buff[start_count]))?;
+            self.serial
+                .read_exact(std::slice::from_mut(&mut self.buff[start_count]))
+                .await?;
             //println!("start_count : {start_count} = Read {:02X?}", buff[start_count]);
             if start_count == 0 {
                 if self.buff[start_count] == 0xFA {
@@ -409,8 +416,7 @@ impl LFCDLaser {
                 }
             } else if start_count == 1 {
                 if self.buff[start_count] == 0xA0 {
-                    // self.read_exact(&mut self.buff[2..])?;
-                    mio_read_exact!(&mut self.serial, &mut self.buff[2..])?;
+                    self.serial.read_exact(&mut self.buff[2..]).await?;
 
                     //read data in sets of 6
 
@@ -457,38 +463,4 @@ impl LFCDLaser {
             }
         }
     }
-
-
-    // pub fn read_exact(&mut self, buf: &mut [u8]) -> mio_serial::Result<()> {
-    //     loop {
-    //         match self.serial.read_exact(buf) {
-    //             Ok(_) => return Ok(()),
-    //             Err(e) => {
-    //                 match e.kind() {
-    //                     std::io::ErrorKind::WouldBlock => (),
-    //                     _ => return Err(mio_serial::Error::from(e))
-    //                 }
-    //             }
-    //         }
-    //     }
-
-    // }
-}
-
-
-#[macro_export]
-macro_rules! mio_read_exact {
-    ($serial : expr, $buf: expr) => {
-        loop {
-            match $serial.read_exact($buf) {
-                Ok(_) => break Ok(()),
-                Err(e) => {
-                    match e.kind() {
-                        std::io::ErrorKind::WouldBlock => (),
-                        _ => break Err(mio_serial::Error::from(e))
-                    }
-                }
-            }
-        }
-    };
 }
