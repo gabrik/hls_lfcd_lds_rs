@@ -42,7 +42,7 @@ futures = {version = "0.3", optional = true}
 clap = { version = "3.1", features = ["derive"] }
 tokio = {version = "1.17.0", features = ["macros","rt","rt-multi-thread"] }
 async-std = { version = "=1.11.0", features = ["attributes"]}
-
+ctrlc = "3.2.2"
 
 [features]
 ser_de = ["serde","serde-big-array"]

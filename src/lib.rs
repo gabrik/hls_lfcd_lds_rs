@@ -43,6 +43,12 @@ pub static DEFAULT_PORT: &str = "/dev/ttyUSB0";
 /// Default baud_rate of the lidar
 pub static DEFAULT_BAUD_RATE: &str = "230400";
 
+/// Byte sent to stop the lidar, 101 = ASCII 'e'
+static STOP_BYTE: u8 = 101;
+
+/// Byte sent to start the lidar, 98 = ASCII 'b'
+static START_BYTE: u8 = 98;
+
 /// This struct contains the reading from the lidar.
 /// The `ranges` array contains 360 elements, one for each degree,
 /// with a value from 0 to 1000, indicating the distance.
@@ -114,6 +120,12 @@ impl LFCDLaser {
     /// Creates the `LFCDLaser`
     pub fn close(&mut self) {
         self.shutting_down = true;
+
+        // Stopping the Lidar, ignoring the result.
+        #[cfg(not(feature = "async_smol"))]
+        std::io::Write::write_all(&mut self.serial, &[STOP_BYTE]).ok();
+        #[cfg(feature = "async_smol")]
+        std::io::Write::write_all(&mut self.serial.get_mut(), &[STOP_BYTE]).ok();
     }
 
     /// Gets lidar speed.
@@ -135,6 +147,24 @@ impl LFCDLaser {
     pub fn rpms(&self) -> u16 {
         self.rpms
     }
+
+    // Starts the Lidar
+    pub fn start(&mut self) {
+        // Starting the Lidar
+        #[cfg(not(feature = "async_smol"))]
+        std::io::Write::write_all(&mut self.serial, &[START_BYTE]).ok();
+
+        #[cfg(feature = "async_smol")]
+        std::io::Write::write_all(&mut self.serial.get_mut(), &[START_BYTE]).ok();
+
+        self.shutting_down = false;
+    }
+}
+
+impl Drop for LFCDLaser {
+    fn drop(&mut self) {
+        self.close();
+    }
 }
 
 #[cfg(feature = "async_tokio")]
@@ -151,7 +181,7 @@ impl LFCDLaser {
         #[cfg(unix)]
         serial.set_exclusive(false)?;
 
-        Ok(Self {
+        let mut lidar = Self {
             port,
             baud_rate,
             shutting_down: false,
@@ -159,7 +189,11 @@ impl LFCDLaser {
             rpms: 0,
             serial,
             buff: [0u8; 2520],
-        })
+        };
+
+        lidar.start();
+
+        Ok(lidar)
     }
 
     /// Gets a reading from the lidar, returing a `LaserReading` object.
@@ -258,7 +292,7 @@ impl LFCDLaser {
         #[cfg(unix)]
         serial.set_exclusive(false)?;
 
-        Ok(Self {
+        let mut lidar = Self {
             port,
             baud_rate,
             shutting_down: false,
@@ -266,7 +300,11 @@ impl LFCDLaser {
             rpms: 0,
             serial,
             buff: [0u8; 2520],
-        })
+        };
+
+        lidar.start();
+
+        Ok(lidar)
     }
 
     /// Gets a reading from the lidar, returing a `LaserReading` object.
@@ -372,7 +410,7 @@ impl LFCDLaser {
             )
         })?;
 
-        Ok(Self {
+        let mut lidar = Self {
             port,
             baud_rate,
             shutting_down: false,
@@ -380,7 +418,11 @@ impl LFCDLaser {
             rpms: 0,
             serial,
             buff: [0u8; 2520],
-        })
+        };
+
+        lidar.start();
+
+        Ok(lidar)
     }
 
     /// Gets a reading from the lidar, returing a `LaserReading` object.
