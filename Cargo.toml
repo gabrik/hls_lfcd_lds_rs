@@ -14,7 +14,7 @@
 
 [package]
 name = "hls_lfcd_lds_driver"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2021"
 
 repository = "https://github.com/gabrik/hls_lfcd_lds_rs"
