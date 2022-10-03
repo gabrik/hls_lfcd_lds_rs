@@ -39,9 +39,9 @@ futures = {version = "0.3", optional = true}
 
 
 [dev-dependencies]
-clap = { version = "3.1", features = ["derive"] }
+clap = { version = "4.0", features = ["derive"] }
 tokio = {version = "1.17.0", features = ["macros","rt","rt-multi-thread"] }
-async-std = { version = "=1.11.0", features = ["attributes"]}
+async-std = { version = "=1.12.0", features = ["attributes"]}
 ctrlc = "3.2.2"
 
 [features]
